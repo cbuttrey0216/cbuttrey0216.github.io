@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cookeville Weather</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootswatch@4.5.2/dist/pulse/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-dark">
+    <div class="d-flex justify-content-center align-items-center vh-100">
+        <form class="card col-12 col-md-6 col-lg-4">
+            <div class="card-body">
+                <h1 id="location" class="text-center">Location Loading... </h1>
+                <hr />
+                <h3 id="temperature">Temperature: </h3>
+                <h3 id="humidity">Humidity: </h3>
+                <h3 id="conditions">Conditions: </h3>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        // Global Variables
+        const strBaseURL = "https://api.open-meteo.com/v1/forecast?"
+        // End Global Variables
+
+        // Uses the Geolocation API to find the users location
+        function showPosition(position) {
+            const latitude = position.coords.latitude;
+            const longitude = position.coords.longitude;
+
+            // Call forecast 
+            findWeather(latitude, longitude)
+        }
+        function getLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(showPosition, showError);
+            } else {
+                console.error("Geolocation is not supported by this browser.");
+            }
+        }
+        function showError(error) {
+            switch (error.code) {
+                case error.PERMISSION_DENIED:
+                console.error("User denied the request for Geolocation.");
+            break;
+            case error.POSITION_UNAVAILABLE:
+                console.error("Location information is unavailable.");
+            break;
+            case error.TIMEOUT:
+                console.error("The request to get user location timed out.");
+            break;
+            case error.UNKNOWN_ERROR:
+                console.error("An unknown error occurred.");
+            break;
+            }
+        }
+        getLocation()
+
+        async function getCityName(intLatitude, intLongitude) {
+            try {
+                const objResponse = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${intLatitude}&lon=${intLongitude}`)
+                const objData = await objResponse.json()
+                return objData.address.city 
+            } catch (error) {
+                console.error('Geocoding error:', error)
+                return null
+            }
+        }
+
+        async function findWeather(intLatitude, intLongitude) {
+            try {
+                const strCity = await getCityName(intLatitude, intLongitude)
+                const objResponse = await fetch(strBaseURL + `latitude=${intLatitude}&longitude=${intLongitude}&current_weather=true&temperature_unit=fahrenheit&minutely_15=relative_humidity_2m`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                })
+
+                const objData = await objResponse.json()
+
+                // Change visual attributes to display correct data
+                document.getElementById('location').textContent = `${strCity}`;
+                document.getElementById('temperature').textContent = `Temperature: ${objData.current_weather.temperature}°F`;
+                document.getElementById('humidity').textContent = `Humidity: ${objData.minutely_15.relative_humidity_2m[0]}%`;
+                document.getElementById('conditions').textContent = `Conditions: ${getWeatherDescription(objData.current_weather.weathercode)}`;
+
+                if(!objResponse.ok) {
+                    throw new Error('HTTP Error Status', objResponse.status)
+                }
+            } catch(objError) {
+                console.log('Error fetching objData', objError)
+            }
+        }
+
+        // Uses weather codes to show on application
+        function getWeatherDescription(code) {
+            const weatherCodes = {
+                0: 'Clear sky',
+                1: 'Mainly clear',
+                2: 'Partly cloudy',
+                3: 'Overcast',
+                45: 'Fog',
+                61: 'Slight rain',
+                63: 'Moderate rain',
+                65: 'Heavy rain',
+                71: 'Slight snow',
+                73: 'Moderate snow',
+                75: 'Heavy snow',
+                95: 'Thunderstorm',
+            };
+            return weatherCodes[code] || 'Unknown conditions';
+        }
+
+    </script>
+
+</body>
+</html>
